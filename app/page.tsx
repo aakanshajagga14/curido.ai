@@ -216,7 +216,7 @@ export default function Home() {
           {/* Sections */}
           <div className="border border-[#c8ddd4] rounded-xl overflow-hidden mb-3">
             {[
-              { label: "Summary", icon: "📄", body: brief.summary },
+              { label: "Summary", body: brief.summary },
               { label: "Key findings", icon: "✅", body: brief.keyFindings },
               { label: "Trends & developments", icon: "📈", body: brief.trends },
               { label: "Outlook", icon: "🔭", body: brief.outlook },
