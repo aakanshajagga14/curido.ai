@@ -217,9 +217,9 @@ export default function Home() {
           <div className="border border-[#c8ddd4] rounded-xl overflow-hidden mb-3">
             {[
               { label: "Summary", body: brief.summary },
-              { label: "Key findings", icon: "✅", body: brief.keyFindings },
-              { label: "Trends & developments", icon: "📈", body: brief.trends },
-              { label: "Outlook", icon: "🔭", body: brief.outlook },
+              { label: "Key findings", body: brief.keyFindings },
+              { label: "Trends & developments", body: brief.trends },
+              { label: "Outlook", body: brief.outlook },
             ].map(({ label, icon, body }) => (
               <div key={label} className="px-5 py-4 border-b border-[#e8f0ec] last:border-0 bg-white">
                 <div className="flex items-center gap-2 mb-2.5">
