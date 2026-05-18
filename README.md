@@ -41,8 +41,8 @@ SSE stream delivers plan + progress + brief to UI in real time
 
 ## Stack
 
-| Layer | Tool | Cost |
-|---|---|---|
+| Layer | Tool |
+|---|---|
 | Frontend + API routes | Next.js (App Router) | 
 | Hosting | Vercel | 
 | Web search | Tavily API | 
