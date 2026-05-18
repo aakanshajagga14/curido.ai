@@ -43,11 +43,11 @@ SSE stream delivers plan + progress + brief to UI in real time
 
 | Layer | Tool | Cost |
 |---|---|---|
-| Frontend + API routes | Next.js (App Router) | Free |
-| Hosting | Vercel | Free tier |
-| Web search | Tavily API | 1,000 searches/month free |
-| LLM (planning + synthesis) | Groq — Llama 3.3 70B | Free tier |
-| Streaming | Server-sent events (SSE) | Built in |
+| Frontend + API routes | Next.js (App Router) | 
+| Hosting | Vercel | 
+| Web search | Tavily API | 
+| LLM (planning + synthesis) | Groq — Llama 3.3 70B | 
+| Streaming | Server-sent events (SSE) | 
 
 ---
 
