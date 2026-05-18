@@ -220,14 +220,11 @@ export default function Home() {
               { label: "Key findings", body: brief.keyFindings },
               { label: "Trends & developments", body: brief.trends },
               { label: "Outlook", body: brief.outlook },
-            ].map(({ label, icon, body }) => (
+            ].map(({ label, body }) => (
               <div key={label} className="px-5 py-4 border-b border-[#e8f0ec] last:border-0 bg-white">
-                <div className="flex items-center gap-2 mb-2.5">
-                  <span className="text-sm">{icon}</span>
-                  <span className="text-[10px] font-medium uppercase tracking-widest text-[#3B6D11]">
-                    {label}
-                  </span>
-                </div>
+                <span className="block text-[10px] font-medium uppercase tracking-widest text-[#3B6D11] mb-2.5">
+                  {label}
+                </span>
                 <p className="text-sm text-[#1a3a2a] leading-relaxed whitespace-pre-wrap">{body}</p>
               </div>
             ))}
