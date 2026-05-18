@@ -4,10 +4,18 @@ import { NextRequest } from "next/server";
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 function normalizeBrief(raw: Record<string, unknown>) {
-  const toText = (v: unknown) =>
-    Array.isArray(v)
-      ? v.map((x) => String(x).trim()).filter(Boolean).join("\n")
-      : String(v ?? "");
+  const toText = (v: unknown) => {
+    if (Array.isArray(v)) {
+      return v
+        .map((x) => {
+          const line = String(x).trim();
+          return line.startsWith("•") ? line : `• ${line}`;
+        })
+        .filter(Boolean)
+        .join("\n");
+    }
+    return String(v ?? "");
+  };
   return {
     title: String(raw.title ?? "Research Brief"),
     summary: String(raw.summary ?? ""),
@@ -16,6 +24,68 @@ function normalizeBrief(raw: Record<string, unknown>) {
     outlook: String(raw.outlook ?? ""),
   };
 }
+
+function stripCodeFences(text: string): string {
+  return text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
+}
+
+function extractJsonObject(text: string): Record<string, unknown> | null {
+  const cleaned = stripCodeFences(text);
+  try {
+    return JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    /* try substring extraction */
+  }
+
+  const start = cleaned.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(cleaned.slice(start, i + 1)) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+const SYNTHESIS_SYSTEM = `You are a research analyst. Synthesize web search results into a structured brief.
+Return ONLY a valid JSON object — no markdown, no backticks, no preamble.
+Every value must be a JSON string (never an array). Use \\n for line breaks inside strings.
+For keyFindings and trends, put bullet lines inside one string, each line starting with •
+{
+  "title": "Research Brief: [topic]",
+  "summary": "2-3 sentence executive summary",
+  "keyFindings": "• first finding\\n• second finding",
+  "trends": "• first trend\\n• second trend",
+  "outlook": "2-3 sentences on future implications and what to watch"
+}`;
 
 export async function POST(req: NextRequest) {
   const { topic } = await req.json();
@@ -120,56 +190,62 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Format context for synthesis
+        // Format context for synthesis (cap snippet length to avoid truncation)
+        const clip = (s: string, max = 500) =>
+          s.length <= max ? s : `${s.slice(0, max)}…`;
+
         const context = searchResults
           .map(
             ({ query, results }) =>
               `### Angle: ${query}\n` +
-              results
-                .map((r: { title: string; url: string; content: string }, i: number) => `[${i + 1}] ${r.title}\n${r.content}`)
-                .join("\n\n")
+              (results.length === 0
+                ? "No results."
+                : results
+                    .map(
+                      (
+                        r: { title: string; url: string; content: string },
+                        i: number
+                      ) =>
+                        `[${i + 1}] ${r.title}\n${clip(r.content ?? "")}`
+                    )
+                    .join("\n\n"))
           )
           .join("\n\n---\n\n");
 
         // Step 3: Groq synthesizes everything
         send("status", { message: "Synthesizing across all sources..." });
 
-        const synthesis = await groq.chat.completions.create({
-          model: "llama-3.3-70b-versatile",
-          temperature: 0.3,
-          messages: [
-            {
-              role: "system",
-              content: `You are a research analyst. You have been given search results from multiple research angles. Synthesize them into a comprehensive brief.
-Return ONLY a valid JSON object — no markdown, no backticks:
-{
-  "title": "Research Brief: [topic]",
-  "summary": "2-3 sentence executive summary",
-  "keyFindings": "4-6 key findings, each on its own line starting with •",
-  "trends": "3-5 current trends or recent developments, each starting with •",
-  "outlook": "2-3 sentences on future implications and what to watch"
-}`,
-            },
-            {
-              role: "user",
-              content: `Topic: "${topic}"\n\nResearch results from ${queries.length} angles:\n\n${context}`,
-            },
-          ],
-        });
+        const userContent = `Topic: ${topic.trim()}\n\nResearch results from ${queries.length} angles:\n\n${context || "No search results found."}`;
 
-        const synthText = synthesis.choices[0]?.message?.content || "";
+        async function synthesizeBrief() {
+          const completion = await groq.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.2,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: SYNTHESIS_SYSTEM },
+              { role: "user", content: userContent },
+            ],
+          });
+          return completion.choices[0]?.message?.content ?? "";
+        }
 
-        let brief;
-        try {
-          const match = synthText.match(/\{[\s\S]*\}/);
-          brief = normalizeBrief(
-            JSON.parse(match ? match[0] : synthText) as Record<string, unknown>
-          );
-        } catch {
+        let synthText = await synthesizeBrief();
+        let parsed = extractJsonObject(synthText);
+
+        if (!parsed) {
+          synthText = await synthesizeBrief();
+          parsed = extractJsonObject(synthText);
+        }
+
+        if (!parsed) {
+          console.error("Groq synthesis parse failed:", synthText.slice(0, 500));
           send("error", { message: "Failed to parse brief" });
           controller.close();
           return;
         }
+
+        const brief = normalizeBrief(parsed);
 
         send("brief", { brief, sources });
         send("status", { message: `Done · ${sources.length} sources across ${queries.length} angles` });
