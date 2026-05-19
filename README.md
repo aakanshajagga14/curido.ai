@@ -1,6 +1,6 @@
 # Curido AI: Research Agent
 
-A research agent that plans its own search strategy, runs parallel web searches, and synthesizes everything into a structured brief. Built with Next.js + Groq + Tavily.
+A research agent that plans its own search strategy, runs parallel web searches, and synthesizes everything into a structured brief. 
 
 ## What makes this an agent (not a wrapper)
 
